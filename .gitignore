@@ -1,0 +1,10 @@
+*.html
+*.md
+*.log
+*.pyc
+*.pyc
+__pycache__/
+env/
+venv/
+.DS_Store
+.idea/

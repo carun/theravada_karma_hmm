@@ -8,6 +8,60 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
+try:
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import plotly.express as px
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+
+class TimeUnit(Enum):
+    DAYS = "days"
+    MONTHS = "months"
+    YEARS = "years"
+    LIFETIMES = "lifetimes"
+    REBIRTHS = "rebirths"
+
+class TimeScale:
+    """Manages time scaling and conversion between different temporal units"""
+
+    def __init__(self, base_unit: TimeUnit = TimeUnit.DAYS, scale_factor: float = 1.0):
+        self.base_unit = base_unit
+        self.scale_factor = scale_factor
+
+        # Conversion factors to days
+        self.conversion_to_days = {
+            TimeUnit.DAYS: 1,
+            TimeUnit.MONTHS: 30,
+            TimeUnit.YEARS: 365,
+            TimeUnit.LIFETIMES: 25550,  # ~70 years average
+            TimeUnit.REBIRTHS: 25550   # Same as lifetimes for practical purposes
+        }
+
+    def convert_to_display_units(self, time_steps: int) -> float:
+        """Convert internal time steps to display units"""
+        return (time_steps * self.scale_factor) / self.conversion_to_days[self.base_unit]
+
+    def convert_from_display_units(self, display_time: float) -> int:
+        """Convert display units to internal time steps"""
+        return int((display_time * self.conversion_to_days[self.base_unit]) / self.scale_factor)
+
+    def get_display_label(self) -> str:
+        """Get the appropriate label for time axis"""
+        unit_labels = {
+            TimeUnit.DAYS: "Days",
+            TimeUnit.MONTHS: "Months",
+            TimeUnit.YEARS: "Years",
+            TimeUnit.LIFETIMES: "Lifetimes",
+            TimeUnit.REBIRTHS: "Rebirths"
+        }
+        return unit_labels[self.base_unit]
+
+    def format_time_point(self, time_steps: int) -> str:
+        """Format a time point for display"""
+        display_time = self.convert_to_display_units(time_steps)
+        return f"{display_time:.2f} {self.base_unit.value}"
 
 class PathStage(Enum):
     ORDINARY = "ordinary"
@@ -197,7 +251,8 @@ class KilesamState:
                 setattr(self, key, value)
 
 class TheravadaKarmaHMM:
-    def __init__(self):
+    def __init__(self, time_unit: TimeUnit = TimeUnit.DAYS, time_scale_factor: float = 1.0):
+        self.time_scale = TimeScale(time_unit, time_scale_factor)
         self.kilesa_decay_rates = {
             'hatred': 0.8, 'greed': 0.7, 'delusion': 0.02,
             'anger': 0.9, 'ill_will': 0.8, 'aversion': 0.8,
@@ -706,7 +761,7 @@ class TheravadaKarmaHMM:
 
         return rebirth
 
-    def visualize_karmic_evolution(self, save_path: Optional[str] = None):
+    def visualize_karmic_evolution(self):
         if not self.history_log:
             print("No history data available for visualization")
             return
@@ -714,12 +769,16 @@ class TheravadaKarmaHMM:
         df = pd.DataFrame(self.history_log)
         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
 
+        # Convert time values for display
+        state_data = df[df['action_type'] == 'state_update'].copy()
+        display_times = [self.time_scale.convert_to_display_units(t) for t in state_data['time']]
+        time_label = self.time_scale.get_display_label()
+
         # Plot 1: Karmic accumulation over time
         ax1 = axes[0, 0]
-        state_data = df[df['action_type'] == 'state_update']
-        ax1.plot(state_data['time'], state_data['total_accumulated_unwholesome'], 'r-', label='Unwholesome Karma', linewidth=2)
-        ax1.plot(state_data['time'], state_data['total_accumulated_wholesome'], 'g-', label='Wholesome Karma', linewidth=2)
-        ax1.set_xlabel('Time')
+        ax1.plot(display_times, state_data['total_accumulated_unwholesome'], 'r-', label='Unwholesome Karma', linewidth=2)
+        ax1.plot(display_times, state_data['total_accumulated_wholesome'], 'g-', label='Wholesome Karma', linewidth=2)
+        ax1.set_xlabel(f'Time ({time_label})')
         ax1.set_ylabel('Accumulated Karma')
         ax1.set_title('Karmic Accumulation Over Time')
         ax1.legend()
@@ -727,8 +786,8 @@ class TheravadaKarmaHMM:
 
         # Plot 2: Active seeds count over time
         ax2 = axes[0, 1]
-        ax2.plot(state_data['time'], state_data['active_seeds_count'], 'b-', linewidth=2)
-        ax2.set_xlabel('Time')
+        ax2.plot(display_times, state_data['active_seeds_count'], 'b-', linewidth=2)
+        ax2.set_xlabel(f'Time ({time_label})')
         ax2.set_ylabel('Active Karmic Seeds')
         ax2.set_title('Active Karmic Seeds Over Time')
         ax2.grid(True, alpha=0.3)
@@ -736,8 +795,8 @@ class TheravadaKarmaHMM:
         # Plot 3: Meditation effects over time
         ax3 = axes[1, 0]
         if 'meditation_suppression' in state_data.columns:
-            ax3.plot(state_data['time'], state_data['meditation_suppression'], 'purple', linewidth=2)
-            ax3.set_xlabel('Time')
+            ax3.plot(display_times, state_data['meditation_suppression'], 'purple', linewidth=2)
+            ax3.set_xlabel(f'Time ({time_label})')
             ax3.set_ylabel('Meditation Suppression Factor')
             ax3.set_title('Meditation Practice Effects')
             ax3.set_ylim(0, 1)
@@ -747,14 +806,12 @@ class TheravadaKarmaHMM:
         ax4 = axes[1, 1]
         path_stages = ['ordinary', 'stream_entry', 'once_returner', 'non_returner', 'arahant']
         path_progression = []
-        times = []
 
         for _, row in state_data.iterrows():
-            times.append(row['time'])
             path_progression.append(path_stages.index(row['path_stage']))
 
-        ax4.step(times, path_progression, where='post', linewidth=2, color='orange')
-        ax4.set_xlabel('Time')
+        ax4.step(display_times, path_progression, where='post', linewidth=2, color='orange')
+        ax4.set_xlabel(f'Time ({time_label})')
         ax4.set_ylabel('Path Stage')
         ax4.set_yticks(range(len(path_stages)))
         ax4.set_yticklabels([s.replace('_', ' ').title() for s in path_stages])
@@ -763,13 +820,143 @@ class TheravadaKarmaHMM:
 
         plt.tight_layout()
 
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"Visualization saved to {save_path}")
-        else:
-            plt.show()
+        plt.show()
 
-    def visualize_kilesa_patterns(self, save_path: Optional[str] = None):
+    def visualize_karmic_evolution_interactive(self, save_path: Optional[str] = None):
+        """Create interactive plotly visualization of karmic evolution"""
+        if not PLOTLY_AVAILABLE:
+            print("Plotly not available. Using matplotlib fallback.")
+            self.visualize_karmic_evolution()
+            return
+
+        if not self.history_log:
+            print("No history data available for visualization")
+            return
+
+        df = pd.DataFrame(self.history_log)
+        state_data = df[df['action_type'] == 'state_update'].copy()
+
+        # Convert time values for display
+        display_times = [self.time_scale.convert_to_display_units(t) for t in state_data['time']]
+        time_label = self.time_scale.get_display_label()
+        state_data['display_time'] = display_times
+
+        # Create subplots
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=(
+                'Karmic Accumulation Over Time',
+                'Active Karmic Seeds Over Time',
+                'Meditation Practice Effects',
+                'Spiritual Path Progression'
+            ),
+            specs=[[{"secondary_y": False}, {"secondary_y": False}],
+                   [{"secondary_y": False}, {"secondary_y": False}]]
+        )
+
+        # Plot 1: Karmic accumulation
+        fig.add_trace(
+            go.Scatter(
+                x=state_data['display_time'],
+                y=state_data['total_accumulated_unwholesome'],
+                mode='lines',
+                name='Unwholesome Karma',
+                line=dict(color='red', width=2),
+                hovertemplate=f'Time: %{{x:.2f}} {time_label}<br>Unwholesome: %{{y:.3f}}<extra></extra>'
+            ),
+            row=1, col=1
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=state_data['display_time'],
+                y=state_data['total_accumulated_wholesome'],
+                mode='lines',
+                name='Wholesome Karma',
+                line=dict(color='green', width=2),
+                hovertemplate=f'Time: %{{x:.2f}} {time_label}<br>Wholesome: %{{y:.3f}}<extra></extra>'
+            ),
+            row=1, col=1
+        )
+
+        # Plot 2: Active seeds
+        fig.add_trace(
+            go.Scatter(
+                x=state_data['display_time'],
+                y=state_data['active_seeds_count'],
+                mode='lines',
+                name='Active Seeds',
+                line=dict(color='blue', width=2),
+                hovertemplate=f'Time: %{{x:.2f}} {time_label}<br>Active Seeds: %{{y}}<extra></extra>'
+            ),
+            row=1, col=2
+        )
+
+        # Plot 3: Meditation effects
+        if 'meditation_suppression' in state_data.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=state_data['display_time'],
+                    y=state_data['meditation_suppression'],
+                    mode='lines',
+                    name='Meditation Suppression',
+                    line=dict(color='purple', width=2),
+                    hovertemplate=f'Time: %{{x:.2f}} {time_label}<br>Suppression: %{{y:.3f}}<extra></extra>'
+                ),
+                row=2, col=1
+            )
+
+        # Plot 4: Path progression
+        path_stages = ['ordinary', 'stream_entry', 'once_returner', 'non_returner', 'arahant']
+        path_progression = [path_stages.index(row['path_stage']) for _, row in state_data.iterrows()]
+        path_names = [row['path_stage'].replace('_', ' ').title() for _, row in state_data.iterrows()]
+
+        fig.add_trace(
+            go.Scatter(
+                x=state_data['display_time'],
+                y=path_progression,
+                mode='lines+markers',
+                name='Path Stage',
+                line=dict(color='orange', width=2),
+                customdata=path_names,
+                hovertemplate=f'Time: %{{x:.2f}} {time_label}<br>Stage: %{{customdata}}<extra></extra>'
+            ),
+            row=2, col=2
+        )
+
+        # Update layout
+        fig.update_layout(
+            title_text="Interactive Karmic Evolution Dashboard",
+            height=800,
+            showlegend=True,
+            hovermode='x unified'
+        )
+
+        # Update axes labels
+        fig.update_xaxes(title_text=f"Time ({time_label})", row=1, col=1)
+        fig.update_xaxes(title_text=f"Time ({time_label})", row=1, col=2)
+        fig.update_xaxes(title_text=f"Time ({time_label})", row=2, col=1)
+        fig.update_xaxes(title_text=f"Time ({time_label})", row=2, col=2)
+
+        fig.update_yaxes(title_text="Accumulated Karma", row=1, col=1)
+        fig.update_yaxes(title_text="Active Seeds Count", row=1, col=2)
+        fig.update_yaxes(title_text="Suppression Factor", row=2, col=1)
+        fig.update_yaxes(
+            title_text="Path Stage",
+            tickmode='array',
+            tickvals=list(range(len(path_stages))),
+            ticktext=[s.replace('_', ' ').title() for s in path_stages],
+            row=2, col=2
+        )
+
+        if save_path:
+            html_path = f"{save_path}.html"
+            fig.write_html(html_path)
+            print(f"Interactive visualization saved to {html_path}")
+        else:
+            fig.show()
+
+    def visualize_kilesa_patterns(self):
         if not self.history_log:
             print("No history data available for visualization")
             return
@@ -799,20 +986,418 @@ class TheravadaKarmaHMM:
             fill_value=0
         )
 
+        # Convert time columns to display units
+        time_label = self.time_scale.get_display_label()
+        display_columns = {}
+        for col in pivot_table.columns:
+            display_time = self.time_scale.convert_to_display_units(col)
+            display_columns[col] = f"{display_time:.1f}"
+        pivot_table = pivot_table.rename(columns=display_columns)
+
         plt.figure(figsize=(15, 10))
         sns.heatmap(pivot_table, cmap='Reds', cbar_kws={'label': 'Activation Intensity'})
         plt.title('Kilesa Activation Patterns Over Time')
-        plt.xlabel('Time')
+        plt.xlabel(f'Time ({time_label})')
         plt.ylabel('Kilesa Type')
         plt.xticks(rotation=45)
         plt.yticks(rotation=0)
         plt.tight_layout()
 
+        plt.show()
+
+    def visualize_kilesa_patterns_interactive(self, save_path: Optional[str] = None):
+        """Create interactive plotly heatmap of kilesa patterns"""
+        if not PLOTLY_AVAILABLE:
+            print("Plotly not available. Using matplotlib fallback.")
+            self.visualize_kilesa_patterns()
+            return
+
+        if not self.history_log:
+            print("No history data available for visualization")
+            return
+
+        kilesa_timeline = []
+        for entry in self.history_log:
+            if entry['action_type'] not in ['wholesome', 'unwholesome']:
+                continue
+            time_point = entry['time']
+            for kilesa in entry.get('kilesas_activated', []):
+                kilesa_timeline.append({
+                    'time': time_point,
+                    'display_time': self.time_scale.convert_to_display_units(time_point),
+                    'kilesa': kilesa,
+                    'intensity': entry['intention_strength']
+                })
+
+        if not kilesa_timeline:
+            print("No kilesa activation data available")
+            return
+
+        kilesa_df = pd.DataFrame(kilesa_timeline)
+        pivot_table = kilesa_df.pivot_table(
+            values='intensity',
+            index='kilesa',
+            columns='display_time',
+            aggfunc='sum',
+            fill_value=0
+        )
+
+        time_label = self.time_scale.get_display_label()
+
+        # Create interactive heatmap
+        fig = go.Figure(data=go.Heatmap(
+            z=pivot_table.values,
+            x=[f"{t:.1f}" for t in pivot_table.columns],
+            y=pivot_table.index,
+            colorscale='Reds',
+            colorbar=dict(title="Activation Intensity"),
+            hovertemplate=f'Time: %{{x}} {time_label}<br>Kilesa: %{{y}}<br>Intensity: %{{z:.3f}}<extra></extra>'
+        ))
+
+        fig.update_layout(
+            title="Interactive Kilesa Activation Patterns Over Time",
+            xaxis_title=f"Time ({time_label})",
+            yaxis_title="Kilesa Type",
+            height=600,
+            width=1000
+        )
+
         if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"Kilesa patterns visualization saved to {save_path}")
+            html_path = f"{save_path}_interactive.html"
+            fig.write_html(html_path)
+            print(f"Interactive kilesa patterns saved to {html_path}")
         else:
-            plt.show()
+            fig.show()
+
+    def visualize_kilesa_interaction_network(self, save_path: Optional[str] = None, layout_type: str = 'spring'):
+        """Create network visualization of kilesa interactions"""
+        if not PLOTLY_AVAILABLE:
+            print("Plotly not available. Network visualization requires plotly.")
+            return
+
+        # Extract nodes and edges from kilesa interactions
+        nodes = set()
+        edges = []
+        edge_weights = []
+        edge_colors = []
+
+        # Add all kilesas as nodes
+        for kilesa in self.current_kilesas.to_dict().keys():
+            nodes.add(kilesa)
+
+        # Add interaction edges
+        for (k1, k2), weight in self.kilesa_interactions.items():
+            if k1 in nodes and k2 in nodes:
+                edges.append((k1, k2))
+                edge_weights.append(abs(weight))
+                edge_colors.append('red' if weight > 0 else 'blue')
+                nodes.add(k1)
+                nodes.add(k2)
+
+        # Create node positions using simple circular layout for now
+        import math
+        node_list = list(nodes)
+        n_nodes = len(node_list)
+        node_positions = {}
+
+        if layout_type == 'circular':
+            for i, node in enumerate(node_list):
+                angle = 2 * math.pi * i / n_nodes
+                node_positions[node] = (math.cos(angle), math.sin(angle))
+        else:  # spring layout approximation
+            # Simple grid layout as approximation
+            grid_size = int(math.ceil(math.sqrt(n_nodes)))
+            for i, node in enumerate(node_list):
+                x = (i % grid_size) - grid_size/2
+                y = (i // grid_size) - grid_size/2
+                node_positions[node] = (x, y)
+
+        # Create edge traces
+        edge_traces = []
+        for i, (k1, k2) in enumerate(edges):
+            x0, y0 = node_positions[k1]
+            x1, y1 = node_positions[k2]
+            weight = edge_weights[i]
+            color = edge_colors[i]
+
+            edge_trace = go.Scatter(
+                x=[x0, x1, None],
+                y=[y0, y1, None],
+                mode='lines',
+                line=dict(
+                    width=max(1, weight * 5),
+                    color=color
+                ),
+                hoverinfo='text',
+                text=f'{k1} ↔ {k2}<br>Weight: {self.kilesa_interactions.get((k1, k2), 0):.2f}',
+                showlegend=False
+            )
+            edge_traces.append(edge_trace)
+
+        # Create node trace
+        node_x = []
+        node_y = []
+        node_text = []
+        node_colors = []
+
+        # Get current kilesa strengths for node coloring
+        current_kilesas = self.current_kilesas.to_dict()
+
+        for node in node_list:
+            x, y = node_positions[node]
+            node_x.append(x)
+            node_y.append(y)
+            intensity = current_kilesas.get(node, 0)
+            node_colors.append(intensity)
+            node_text.append(f'{node}<br>Current: {intensity:.3f}')
+
+        node_trace = go.Scatter(
+            x=node_x,
+            y=node_y,
+            mode='markers+text',
+            text=[node.replace('_', '<br>') for node in node_list],
+            textposition='middle center',
+            hoverinfo='text',
+            hovertext=node_text,
+            marker=dict(
+                size=20,
+                color=node_colors,
+                colorscale='Viridis',
+                colorbar=dict(
+                    title="Current Kilesa Strength",
+                    thickness=15,
+                    len=0.7
+                ),
+                line=dict(width=2, color='white')
+            ),
+            textfont=dict(size=8)
+        )
+
+        # Create figure
+        fig = go.Figure()
+
+        # Add edge traces
+        for trace in edge_traces:
+            fig.add_trace(trace)
+
+        # Add node trace
+        fig.add_trace(node_trace)
+
+        # Add legend for edge colors
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None],
+            mode='lines',
+            line=dict(color='red', width=3),
+            name='Reinforcing (+)',
+            showlegend=True
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None],
+            mode='lines',
+            line=dict(color='blue', width=3),
+            name='Suppressing (-)',
+            showlegend=True
+        ))
+
+        fig.update_layout(
+            title="Interactive Kilesa Interaction Network",
+            showlegend=True,
+            hovermode='closest',
+            margin=dict(b=20,l=5,r=5,t=40),
+            annotations=[
+                dict(
+                    text="Node size reflects current activation level<br>"
+                         "Edge width reflects interaction strength<br>"
+                         "Red = Reinforcing, Blue = Suppressing",
+                    showarrow=False,
+                    xref="paper", yref="paper",
+                    x=0.005, y=-0.002,
+                    xanchor='left', yanchor='bottom',
+                    font=dict(size=10)
+                )
+            ],
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            height=700,
+            width=1000
+        )
+
+        if save_path:
+            html_path = f"{save_path}_network.html"
+            fig.write_html(html_path)
+            print(f"Interactive network visualization saved to {html_path}")
+        else:
+            fig.show()
+
+    def compare_scenarios(self, scenarios: List[Dict], time_steps: int = 30) -> Dict:
+        """Compare different scenarios and return comparative analysis"""
+        results = {}
+
+        for scenario_name, config in scenarios:
+            # Create a new instance for this scenario
+            scenario_model = TheravadaKarmaHMM(
+                time_unit=config.get('time_unit', TimeUnit.DAYS),
+                time_scale_factor=config.get('time_scale_factor', 1.0)
+            )
+
+            # Set up meditation practices
+            for practice_config in config.get('meditation_practices', []):
+                practice = MeditationPractice(**practice_config)
+                scenario_model.add_meditation_practice(practice)
+
+            # Set path stage if specified
+            if 'path_stage' in config:
+                scenario_model.set_path_stage(config['path_stage'])
+
+            # Perform actions as specified
+            for action in config.get('actions', []):
+                scenario_model.perform_action(
+                    action['intention_strength'],
+                    action['active_kilesas'],
+                    action.get('object_weight', 1.0),
+                    action.get('wholesome', False)
+                )
+
+            # Advance time with context updates
+            for i in range(time_steps):
+                context_updates = config.get('context_pattern', {})
+                # Apply dynamic context if function provided
+                if callable(context_updates):
+                    context_updates = context_updates(i)
+
+                scenario_model.advance_time(1, context_updates)
+
+            # Store results
+            final_state = scenario_model.get_state_summary()
+            results[scenario_name] = {
+                'model': scenario_model,
+                'final_state': final_state,
+                'accumulated_wholesome': scenario_model.accumulated_wholesome,
+                'accumulated_unwholesome': scenario_model.accumulated_unwholesome,
+                'karmic_balance': scenario_model.accumulated_wholesome - scenario_model.accumulated_unwholesome,
+                'path_stage': scenario_model.path_stage.value,
+                'active_kilesas': {k: v for k, v in scenario_model.current_kilesas.to_dict().items() if v > 0.01}
+            }
+
+        return results
+
+    def visualize_scenario_comparison(self, comparison_results: Dict, save_path: Optional[str] = None):
+        """Create comparative visualization of different scenarios"""
+        if not PLOTLY_AVAILABLE:
+            print("Plotly not available. Using simple comparison print.")
+            self._print_scenario_comparison(comparison_results)
+            return
+
+        scenarios = list(comparison_results.keys())
+        n_scenarios = len(scenarios)
+
+        # Create subplot grid
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=(
+                'Karmic Balance Comparison',
+                'Path Stage Comparison',
+                'Active Kilesas Count',
+                'Karmic Evolution Timeline'
+            )
+        )
+
+        # Plot 1: Karmic Balance
+        wholesome_values = [comparison_results[s]['accumulated_wholesome'] for s in scenarios]
+        unwholesome_values = [comparison_results[s]['accumulated_unwholesome'] for s in scenarios]
+        balance_values = [comparison_results[s]['karmic_balance'] for s in scenarios]
+
+        fig.add_trace(
+            go.Bar(name='Wholesome', x=scenarios, y=wholesome_values, marker_color='green'),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Bar(name='Unwholesome', x=scenarios, y=unwholesome_values, marker_color='red'),
+            row=1, col=1
+        )
+
+        # Plot 2: Path Stages
+        path_stages = ['ordinary', 'stream_entry', 'once_returner', 'non_returner', 'arahant']
+        path_values = [path_stages.index(comparison_results[s]['path_stage']) for s in scenarios]
+
+        fig.add_trace(
+            go.Bar(x=scenarios, y=path_values, marker_color='orange', name='Path Stage'),
+            row=1, col=2
+        )
+
+        # Plot 3: Active Kilesas Count
+        kilesa_counts = [len(comparison_results[s]['active_kilesas']) for s in scenarios]
+
+        fig.add_trace(
+            go.Bar(x=scenarios, y=kilesa_counts, marker_color='purple', name='Active Kilesas'),
+            row=2, col=1
+        )
+
+        # Plot 4: Timeline comparison (first scenario for now)
+        if scenarios:
+            first_scenario = scenarios[0]
+            model = comparison_results[first_scenario]['model']
+            df = pd.DataFrame(model.history_log)
+            state_data = df[df['action_type'] == 'state_update']
+
+            if not state_data.empty:
+                display_times = [model.time_scale.convert_to_display_units(t) for t in state_data['time']]
+                time_label = model.time_scale.get_display_label()
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=display_times,
+                        y=state_data['total_accumulated_wholesome'],
+                        mode='lines',
+                        name=f'{first_scenario} - Wholesome',
+                        line=dict(color='green')
+                    ),
+                    row=2, col=2
+                )
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=display_times,
+                        y=state_data['total_accumulated_unwholesome'],
+                        mode='lines',
+                        name=f'{first_scenario} - Unwholesome',
+                        line=dict(color='red')
+                    ),
+                    row=2, col=2
+                )
+
+        # Update layout
+        fig.update_layout(
+            title_text="Scenario Comparison Dashboard",
+            height=800,
+            showlegend=True
+        )
+
+        # Update y-axis for path stages
+        fig.update_yaxes(
+            tickmode='array',
+            tickvals=list(range(len(path_stages))),
+            ticktext=[s.replace('_', ' ').title() for s in path_stages],
+            row=1, col=2
+        )
+
+        if save_path:
+            html_path = f"{save_path}_comparison.html"
+            fig.write_html(html_path)
+            print(f"Scenario comparison saved to {html_path}")
+        else:
+            fig.show()
+
+    def _print_scenario_comparison(self, comparison_results: Dict):
+        """Simple text-based scenario comparison"""
+        print("\n=== SCENARIO COMPARISON RESULTS ===")
+        for scenario_name, results in comparison_results.items():
+            print(f"\n{scenario_name.upper()}:")
+            print(f"  Karmic Balance: {results['karmic_balance']:.3f}")
+            print(f"  Path Stage: {results['path_stage'].replace('_', ' ').title()}")
+            print(f"  Active Kilesas: {len(results['active_kilesas'])}")
+            print(f"  Strongest Kilesas: {list(results['active_kilesas'].keys())[:3]}")
 
     def generate_rebirth_report(self) -> str:
         if not self.current_rebirth:
@@ -882,9 +1467,11 @@ KARMIC SEEDS STATUS:
 
 # Example usage
 if __name__ == "__main__":
-    karma_model = TheravadaKarmaHMM()
+    # Initialize with meaningful time units - simulating daily practice over months
+    karma_model = TheravadaKarmaHMM(time_unit=TimeUnit.MONTHS, time_scale_factor=1.0)
 
-    print("=== THERAVADA KARMA HMM SIMULATION ===\n")
+    print("=== THERAVADA KARMA HMM SIMULATION ===")
+    print(f"Time scale: {karma_model.time_scale.get_display_label()}\n")
 
     # Add meditation practices
     vipassana = MeditationPractice(MeditationType.VIPASSANA, 1.5, 0.8, 0.6, 2.0, 0.7, 200)
@@ -893,6 +1480,7 @@ if __name__ == "__main__":
     karma_model.add_meditation_practice(metta)
 
     print(f"Added meditation practices")
+    print(f"Current time: {karma_model.time_scale.format_time_point(karma_model.current_time)}")
 
     # Perform actions
     karma_model.current_context.update({'stress_level': 0.8, 'conflict_present': 0.9})
@@ -937,9 +1525,17 @@ if __name__ == "__main__":
 
     # Visualization
     try:
-        karma_model.visualize_karmic_evolution()
-        karma_model.visualize_kilesa_patterns()
-        print("Visualizations created")
+        if PLOTLY_AVAILABLE:
+            print("\nCreating interactive visualizations...")
+            karma_model.visualize_karmic_evolution_interactive("karma_evolution_demo")
+            karma_model.visualize_kilesa_patterns_interactive("kilesa_patterns_demo")
+            karma_model.visualize_kilesa_interaction_network("network_demo")
+            print("Interactive visualizations created")
+        else:
+            print("\nCreating basic visualizations...")
+            karma_model.visualize_karmic_evolution()
+            karma_model.visualize_kilesa_patterns()
+            print("Basic visualizations displayed")
     except Exception as e:
         print(f"Visualization not available: {e}")
 
@@ -949,5 +1545,51 @@ if __name__ == "__main__":
     print(f"Path stage: {final_state['path_stage']}")
     print(f"Karmic balance: {karma_model.accumulated_wholesome - karma_model.accumulated_unwholesome:.2f}")
     print(f"Active practices: {len(karma_model.meditation_practices)}")
+
+    # Demonstrate scenario comparison
+    print("\n=== SCENARIO COMPARISON DEMO ===")
+
+    scenarios = [
+        ("high_meditation", {
+            'time_unit': TimeUnit.MONTHS,
+            'meditation_practices': [
+                {'practice_type': MeditationType.VIPASSANA, 'daily_duration': 2.0, 'consistency': 0.9,
+                 'quality': 0.8, 'years_practiced': 5.0, 'teacher_guidance': 0.9, 'retreat_hours': 500},
+                {'practice_type': MeditationType.METTA, 'daily_duration': 1.0, 'consistency': 0.9,
+                 'quality': 0.8, 'years_practiced': 3.0, 'teacher_guidance': 0.8, 'retreat_hours': 200}
+            ],
+            'actions': [
+                {'intention_strength': 0.8, 'active_kilesas': {}, 'wholesome': True}
+            ],
+            'context_pattern': {'stress_level': 0.3, 'spiritual_environment': 0.9}
+        }),
+        ("low_meditation", {
+            'time_unit': TimeUnit.MONTHS,
+            'meditation_practices': [
+                {'practice_type': MeditationType.VIPASSANA, 'daily_duration': 0.5, 'consistency': 0.5,
+                 'quality': 0.4, 'years_practiced': 1.0, 'teacher_guidance': 0.3, 'retreat_hours': 20}
+            ],
+            'actions': [
+                {'intention_strength': 0.7, 'active_kilesas': {'anger': 0.6, 'greed': 0.5}, 'wholesome': False}
+            ],
+            'context_pattern': {'stress_level': 0.7, 'spiritual_environment': 0.3}
+        }),
+        ("no_meditation", {
+            'time_unit': TimeUnit.MONTHS,
+            'meditation_practices': [],
+            'actions': [
+                {'intention_strength': 0.8, 'active_kilesas': {'hatred': 0.8, 'conceit': 0.7}, 'wholesome': False},
+                {'intention_strength': 0.6, 'active_kilesas': {'greed': 0.7, 'envy': 0.5}, 'wholesome': False}
+            ],
+            'context_pattern': {'stress_level': 0.8, 'spiritual_environment': 0.1}
+        })
+    ]
+
+    try:
+        comparison_results = karma_model.compare_scenarios(scenarios, time_steps=15)
+        karma_model.visualize_scenario_comparison(comparison_results)
+        print("Scenario comparison completed")
+    except Exception as e:
+        print(f"Scenario comparison failed: {e}")
 
     print(f"\n=== SIMULATION COMPLETE ===")
