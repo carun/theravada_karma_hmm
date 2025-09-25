@@ -3,6 +3,9 @@
 :toclevels: 3
 :sectnums:
 :doctype: book
+:prettify-theme: solarizedlight
+:source-highlighter: highlightjs
+:highlightjs-theme: vs
 
 = Abstract
 
@@ -13,6 +16,8 @@ traditional Buddhist psychology with modern computational frameworks to
 enable rigorous scientific investigation of contemplative mental
 dynamics, meditation effects, and long-term computational psychological
 evolution.
+
+toc::[]
 
 == Theoretical Foundation
 
@@ -63,11 +68,11 @@ This framework tries to map onto modern psychological constructs:
 
 I was motivated by my own meditation practice and the desire to
 better understand and predict how my practice might influence attainment of
-Nibbāna.
-I wanted to create this model due to greed and with the lack of a smulator
-for the karmic and kilesa dynamics described in Thēravāda Buddhism. While
-there could be many computational models of general psychology, I felt none
-specifically address the pragmatic features of Thēravāda modeling.
+Nibbāna. I wanted to create this model may be due to my desire for enlightenment
+and the lack of a simulator for the karmic and kilesa dynamics described in
+Thēravāda Buddhism. While there could be many computational models of general
+psychology, I felt none specifically address the pragmatic features of
+Thēravāda modeling.
 
 === Potential Research Questions
 
@@ -230,17 +235,9 @@ def perform_action(intention_strength, active_kilesas, wholesome=False):
 
 === Kilesa Interactions Implemented
 
-The model implements 18 specific kilesa interactions:
-
-*Reinforcement Patterns*:
-* `('hatred', 'conceit'): 1.5` - Pride fuels anger
-* `('anger', 'hostility'): 1.6` - Anger breeds lasting hostility
-* `('craving', 'clinging'): 1.8` - Fundamental dependence
-* `('wrong_view', 'personality_view'): 1.6` - Views reinforce self-view
-
-*Suppression Patterns*:
-* `('sloth_torpor', 'restlessness'): -0.7` - Dullness vs agitation
-* `('mental_torpor', 'restlessness_worry'): -0.6`
+The model implements few kilesa interactions. There could be up to 378 or more
+possible pairwise interactions, but only the most significant ones are included
+based on my understanding.
 
 == Research Applications
 
