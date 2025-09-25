@@ -1,0 +1,545 @@
+= A Computational Framework for Karmic Evolution per Thēravāda Buddhism
+:toc: left
+:toclevels: 3
+:sectnums:
+:doctype: book
+
+= Abstract
+
+This project presents a simple computational model of karma and
+mental defilements (kilesas) based on canonical Thēravāda Buddhist
+sources, implemented as a Hidden Markov Model. The model bridges
+traditional Buddhist psychology with modern computational frameworks to
+enable rigorous scientific investigation of contemplative mental
+dynamics, meditation effects, and long-term computational psychological
+evolution.
+
+== Theoretical Foundation
+
+=== Buddhist Psychology Overview
+
+Thēravāda Buddhism presents a sophisticated psychological framework
+centered on the dynamics of karma (intentional action) and kilesas
+(mental defilements). This system, codified in texts like the Abhidhamma,
+Suttas offers precise taxonomies of mental states and their causal relationships.
+
+*Core Principles*
+
+- *Cetana (Intention)*: The mental factor that creates karmic consequences
+- *Kilesas (Defilements)*: Mental factors that cloud judgment and drive unwholesome actions
+- *Vipaka (Results)*: The ripening of karmic seeds across multiple timescales
+- *Path Development*: Progressive elimination of defilements through contemplative practice
+
+=== Canonical Sources
+
+The model incorporates kilesas from canonical Abhidhamma and Sutta sources only:
+
+. *The 10 Abhidhamma Defilements* (Dhammasangani, Vibhanga):
+* greed (lōbha), hatred (dōsa), delusion (mōha)
+* conceit (māna), wrong view (micchā-diṭṭhi), doubt (vicikicchā)
+* sloth & torpor (thīna), restlessness (uddhacca)
+* shamelessness (ahirika), recklessness (anōttappa)
+
+. *The 10 Fetters (Saṃyojanas)*:
+* Lower fetters (eliminated at Stream Entry): personality view, doubt, rites/rituals
+* Higher fetters: sensual desire, ill-will, form/formless desires, conceit, restlessness, ignorance
+
+. *The 16 Defilements* (Vatthupama Sutta, MN 7):
+* Covetousness, unrighteous greed, ill-will, anger, hostility, denigration, domineering, envy, jealousy, hypocrisy, fraud, obstinacy, presumption, conceit, arrogance, vanity, negligence
+
+* *The 5 Hindrances (Sutta Pitaka)*:
+* Sensual desire, ill-will, sloth-torpor, restlessness-worry, doubt
+
+=== Scientific Relevance
+
+This framework tries to map onto modern psychological constructs:
+
+- *Kilesas*: Maladaptive cognitive-emotional patterns
+- *Karmic seeds*: Latent psychological dispositions
+- *Ripening*: Context dependent expression of traits
+- *Path stages*: Progressive psychological well-being and wisdom development
+
+== Motivation
+
+I was motivated by my own meditation practice and the desire to
+better understand and predict how my practice might influence attainment of
+Nibbāna.
+I wanted to create this model due to greed and with the lack of a smulator
+for the karmic and kilesa dynamics described in Thēravāda Buddhism. While
+there could be many computational models of general psychology, I felt none
+specifically address the pragmatic features of Thēravāda modeling.
+
+=== Potential Research Questions
+
+* How do different meditation practices affect specific categories of mental defilements?
+* What are the optimal practice combinations for different personality types?
+* How do early meditation experiences predict long-term contemplative development?
+* Can we identify biomarkers that correlate with traditional _path attainment_ descriptions?
+* What environmental and social factors facilitate or hinder contemplative development?
+
+== Model Architecture
+
+=== Hidden Markov Model Structure
+
+*Hidden States*: Current kilesa activation levels and accumulated karmic potential
+
+- 28 dimensional state vector covering canonical defilements
+- Dynamic evolution based on intentional actions and environmental contexts
+
+*Observable States*: Behavioral manifestations and life circumstances
+
+- Emotional reactions, relationship patterns, decision-making tendencies
+- Life events, opportunities, challenges, and general well-being indicators
+
+*Transition Probabilities*: Action-based state evolution
+
+- Driven by cetana (intention) strength and kilesa combinations
+- Modified by meditation practice effects and path attainment levels
+- Influenced by environmental context and social factors
+
+=== Key Contributions
+
+. *Sophisticated Ripening Mechanisms*
+* Context-aware triggering based on life circumstances
+* Multiple timescales (immediate, next-life, later-lives, indefinite)
+* Realistic decay functions for different kilesa types
+
+. *Meditation Practice Integration*
+* Practice-specific effects (metta vs vipassana vs samatha)
+* Dose-response relationships based on duration, consistency, quality
+* Teacher guidance and retreat experience factors
+
+. *Path Stage Modeling*
+* Precise kilesa elimination patterns matching traditional descriptions
+* Stream Entry, Once-Returner, Non-Returner, Arahant stages
+* Manual path stage setting with immediate kilesa elimination upon attainment
+
+. *Rebirth Circumstance Prediction*
+* Detailed life condition modeling based on karmic patterns
+* Realm, family, physical, mental, and spiritual circumstances
+* Testable through longitudinal studies of life trajectory patterns
+
+== Core Features
+
+=== Comprehensive Kilesa Coverage
+
+* *28 canonical defilements* from Abhidhamma and Suttas sources only
+* *Interaction patterns* between different kilesa types (18 interactions implemented)
+* *Decay rates* reflecting traditional understanding of defilement persistence
+
+=== Multi-dimensional Meditation Effects
+
+[source,python]
+----
+# Example: Loving-kindness practice specifically counters hatred-based kilesas
+if practice.practice_type == MeditationType.METTA:
+    hatred_kilesas = ['hatred', 'anger', 'ill_will', 'hostility', 'aversion']
+    for kilesa in hatred_kilesas:
+        modified[kilesa] *= (1 - suppression_factor * 1.5)  # 1.5x effectiveness
+----
+
+*Currently Implemented Practice Types*:
+
+* `METTA` - Loving-kindness meditation
+* `VIPASSANA` - Insight meditation
+* `SAMATHA` - Concentration meditation
+* `SATIPATTHANA` - Mindfulness of foundations
+* `ANAPANASATI` - Mindfulness of breathing
+* `KASINA` - Concentration objects
+
+The two big umbrellas of meditation are:
+
+* Samatha (calm, tranquility, concentration)
+* Vipassanā (insight, wisdom, seeing things as they really are)
+
+Everything else listed is not a _third type_ but rather methods
+that fall under one or both of those two categories.
+
+=== Sophisticated Ripening Triggers
+
+[source,python]
+----
+# Context-aware karmic ripening
+ripening_prob = seed.calculate_ripening_probability(
+    current_context, meditation_suppression
+)
+# Includes: strength_factor, context_match, suppression_factor, timing_factor
+----
+
+=== Path Stage Precision
+
+[source,python]
+----
+# Stream Entry eliminates first three fetters completely
+if stage == PathStage.STREAM_ENTRY:
+    modified['personality_view'] = 0.0  # Complete elimination
+    modified['doubt'] = 0.0
+    modified['rites_rituals'] = 0.0
+    # All other kilesas reduced by 40%
+    for other_kilesas: modified[kilesa] *= 0.6
+----
+
+=== Comprehensive Visualization
+
+* *Karmic evolution charts* showing long-term accumulation patterns
+* *Kilesa activation heatmaps* revealing practice effects over time
+* *Path progression tracking* with meditation influence indicators
+* *Rebirth circumstance analysis* for life trajectory prediction
+
+== Implementation Details
+
+=== Core Classes
+
+. *`TheravadaKarmaHMM`*: Main model orchestrating all dynamics
+. *`KarmicSeed`*: Individual action consequences with sophisticated ripening logic
+. *`KilesamState`*: Current mental defilement configuration
+. *`MeditationPractice`*: Practice parameters with realistic effect calculations
+. *`RebirthCircumstance`*: Detailed life condition prediction framework
+. *`RipeningTrigger`*: Context dependent ripening conditions
+
+=== Enums and Types
+
+* *`PathStage`*: ORDINARY, STREAM_ENTRY, ONCE_RETURNER, NON_RETURNER, ARAHANT
+* *`RebirthRealm`*: HELL, ANIMAL, GHOST, HUMAN, DEVA, BRAHMA
+* *`MeditationType`*: SAMATHA, VIPASSANA, SATIPATTHANA, ANAPANASATI, METTA, KASINA
+* *`RipeningType`*: IMMEDIATE, NEXT_LIFE, LATER_LIVES, INDEFINITE
+
+=== Algorithmic Approach
+
+[source,python]
+----
+# Simplified action processing pipeline
+def perform_action(intention_strength, active_kilesas, wholesome=False):
+    # 1. Apply path modifications (eliminate relevant kilesas)
+    modified_kilesas = apply_path_modifications(active_kilesas)
+
+    # 2. Calculate kilesa interactions (reinforcement/suppression)
+    effective_intensities = calculate_kilesa_interactions(modified_kilesas)
+
+    # 3. Apply meditation suppression effects
+    final_intensities = apply_meditation_effects(effective_intensities)
+
+    # 4. Create karmic seeds with sophisticated trigger conditions
+    seeds = create_karmic_seeds(final_intensities, intention_strength)
+
+    # 5. Update state and log for analysis
+    update_state_and_log(seeds)
+
+    return seeds
+----
+
+=== Kilesa Interactions Implemented
+
+The model implements 18 specific kilesa interactions:
+
+*Reinforcement Patterns*:
+* `('hatred', 'conceit'): 1.5` - Pride fuels anger
+* `('anger', 'hostility'): 1.6` - Anger breeds lasting hostility
+* `('craving', 'clinging'): 1.8` - Fundamental dependence
+* `('wrong_view', 'personality_view'): 1.6` - Views reinforce self-view
+
+*Suppression Patterns*:
+* `('sloth_torpor', 'restlessness'): -0.7` - Dullness vs agitation
+* `('mental_torpor', 'restlessness_worry'): -0.6`
+
+== Research Applications
+
+=== Immediate Research Opportunities
+
+. *Meditation Dose-Response Studies*
+* Use model predictions to design optimal practice schedules
+* Test specific practice combinations for different personality types
+* Investigate threshold effects for contemplative development stages
+
+. *Biomarker Correlation Research*
+* Map traditional _path attainments_ to measurable psychological/physiological markers
+* Identify early indicators of deeper contemplative development
+* Develop assessment tools for contemplative progress
+
+. *Intervention Design*
+* Create personalized meditation programs based on individual kilesa profiles
+* Design targeted practices for specific mental health conditions
+* Optimize retreat structures and teacher training programs
+
+=== Longitudinal Study Framework
+
+The model provides a theoretical framework for multi-decade longitudinal studies:
+
+[source,python]
+----
+# Example research protocol
+def longitudinal_study_protocol():
+    # Baseline assessment
+    initial_state = assess_kilesa_profile(participant)
+
+    # Practice intervention
+    practice_program = design_personalized_practice(initial_state)
+
+    # Periodic assessment
+    for year in study_duration:
+        current_state = assess_current_kilesas(participant)
+        life_events = record_life_circumstances(participant)
+        practice_adherence = measure_practice_consistency(participant)
+
+        # Model prediction vs. actual outcome
+        predicted_state = model.advance_time(365, practice_program, life_events)
+        prediction_accuracy = compare_states(predicted_state, current_state)
+
+        # Model refinement
+        if prediction_accuracy < threshold:
+            refine_model_parameters(predicted_state, current_state)
+----
+
+=== Cross Cultural Research
+
+* *Validation across contemplative traditions*: Test model generalizability
+* *Cultural adaptation studies*: Examine via simulation on how social context affects contemplative development
+* *Comparative effectiveness research*: Elaborate this to meditation techniques form different traditions
+
+== Installation and Usage
+
+=== Requirements
+
+[source,bash]
+----
+pip install -r requirements.txt
+----
+
+=== Basic Usage
+
+[source,python]
+----
+from karma_model import TheravadaKarmaHMM, MeditationPractice, MeditationType
+
+# Initialize model
+karma_model = TheravadaKarmaHMM()
+
+# Add meditation practice
+vipassana = MeditationPractice(
+    practice_type=MeditationType.VIPASSANA,
+    daily_duration=1.0,  # hours
+    consistency=0.8,     # 80% consistency
+    quality=0.6,         # skill level
+    years_practiced=2.0,
+    teacher_guidance=0.7,
+    retreat_hours=100
+)
+karma_model.add_meditation_practice(vipassana)
+
+# Simulate action
+seeds = karma_model.perform_action(
+    intention_strength=0.8,
+    active_kilesas={'anger': 0.7, 'conceit': 0.5},
+    wholesome=False
+)
+
+# Advance time with context
+karma_model.advance_time(
+    time_steps=30,
+    context_updates={'stress_level': 0.8, 'social_harmony': 0.3}
+)
+
+# Generate analysis
+karma_model.visualize_karmic_evolution()
+rebirth_report = karma_model.generate_rebirth_report()
+print(rebirth_report)
+----
+
+=== Research Integration Example
+
+[source,python]
+----
+# Example: Study meditation effects on specific kilesas
+def study_metta_effects():
+    control_group = TheravadaKarmaHMM()
+    treatment_group = TheravadaKarmaHMM()
+
+    # Add metta practice to treatment group
+    metta_practice = MeditationPractice(MeditationType.METTA, 0.5, 0.9, 0.7, 1.0, 0.8, 50)
+    treatment_group.add_meditation_practice(metta_practice)
+
+    # Simulate identical stressful situations
+    stressful_context = {'conflict_present': 0.9, 'stress_level': 0.8}
+
+    for day in range(365):
+        # Same challenging situation for both groups
+        control_seeds = control_group.perform_action(
+            0.7, {'anger': 0.8, 'ill_will': 0.6}
+        )
+        treatment_seeds = treatment_group.perform_action(
+            0.7, {'anger': 0.8, 'ill_will': 0.6}
+        )
+
+        control_group.advance_time(1, stressful_context)
+        treatment_group.advance_time(1, stressful_context)
+
+    # Compare outcomes
+    control_state = control_group.get_state_summary()
+    treatment_state = treatment_group.get_state_summary()
+
+    print(f"Control anger levels: {control_state['active_kilesas'].get('anger', 0):.2f}")
+    print(f"Treatment anger levels: {treatment_state['active_kilesas'].get('anger', 0):.2f}")
+----
+
+== Validation and Limitations
+
+=== Model Validation Approaches
+
+. *Face Validity*: Extensive review by Buddhist scholars and meditation teachers
+. *Construct Validity*: Correlation with established psychological measures
+. *Predictive Validity*: Longitudinal study outcome prediction
+. *Cross cultural Validity*: Testing across different Buddhist traditions
+
+=== Current Limitations
+
+. *Parameter Estimation*: Many parameters are theoretically derived rather than empirically fitted
+. *Individual Differences*: Limited modeling of personality and genetic factors
+. *Cultural Context*: Primarily based on traditional South Asian Buddhist contexts
+. *Measurement Challenges*: Difficulty in directly measuring "kilesas" in research settings
+. *Manual Path Attainment*: No automatic triggering of path stages based on conditions
+. *Limited Kilesa Interactions*: Only 18 out of possible 378 kilesa pairs modeled
+. *Simple Ripening Model*: Basic probabilistic model rather than sophisticated temporal dynamics
+
+=== Implementation Gaps
+
+*Features mentioned but not fully implemented*:
+
+* Automatic path attainment based on practice thresholds
+* Gradual kilesa elimination approaching path moments
+* Individual personality trait integration
+* Social network and teacher-student relationship effects
+* Detailed rebirth transition mechanics
+
+=== Addressing Limitations
+
+*Empirical Parameter Refinement*:
+
+[source,python]
+----
+# Example: Bayesian parameter updating based on longitudinal data
+def update_model_parameters(observed_outcomes, predicted_outcomes):
+    likelihood = calculate_likelihood(observed_outcomes, predicted_outcomes)
+    posterior_params = bayesian_update(prior_params, likelihood)
+    model.update_parameters(posterior_params)
+    return updated_accuracy_metrics
+----
+
+*Individual Difference Modeling*:
+
+- Personality trait integration (Big Five, etc.)
+- Genetic vulnerability factors
+- Cultural background considerations
+- Trauma and adverse experience effects
+
+== Future Directions
+
+=== Technical Enhancements
+
+. *Machine Learning Integration*
+* Deep learning models for complex kilesa interactions
+* Reinforcement learning for optimal practice recommendation
+* Natural language processing for meditation journal analysis
+
+. *Real-time Adaptation*
+* Smartphone app integration for daily kilesa tracking
+* Biometric sensor integration (HRV, EEG, etc)
+* Adaptive practice recommendations based on current state
+
+. *Social Network Effects*
+* Community and sangha influence modeling
+* Teacher-student relationship dynamics
+* Cultural and environmental factor integration
+
+=== Research Applicability
+
+- *Neuroscience*: Brain imaging correlates of traditional attainment levels
+- *Clinical Psychology*: Therapeutic application development
+- *Positive Psychology*: Well-being and flourishing research
+- *Anthropology*: Cross cultural contemplative practice studies
+
+=== Clinical Applications
+
+. *Personalized Meditation Therapy*
+* Individual kilesa profile assessment
+* Targeted practice prescription
+* Progress monitoring and adjustment
+
+. *Mental Health Integration*
+* Depression and anxiety treatment enhancement
+* Addiction recovery support
+* Trauma-informed contemplative interventions
+
+. *Preventive Mental Health*
+* Early intervention based on kilesa development patterns
+* Resilience building through contemplative practices
+* Population-level mental health promotion
+
+== Contributing
+
+This model represents an initial framework for computational Buddhist
+psychology. Contributions are welcome in several areas:
+
+. *Parameter Refinement*: Empirical data to improve model accuracy
+. *Feature Extensions*: Additional kilesas, practice types, or contextual factors
+. *Validation Studies*: Research comparing model predictions to real outcomes
+. *Cultural Adaptations*: Extensions to other Buddhist traditions or contemplative systems
+. *Technical Improvements*: More sophisticated algorithms or computational approaches
+
+=== Contact for Collaboration
+
+For research collaborations, please reach out with:
+- Research questions and hypotheses
+- Available datasets or study populations
+- Institutional affiliations and ethics approval status
+- Proposed timeline and resource requirements
+
+== Acknowledgments
+
+This work builds upon thousands of years of contemplative inquiry and
+the dedicated scholarship of Thēravāda Buddhist practitioners and academics.
+This is also inspired by my teachers who have guided me in the process of
+meditation journey and understanding the mind.
+
+Special recognition goes to:
+
+* *Traditional Sources*: The canonical texts
+* *Dr. Daniel Ingram*: For his empirical approach to Buddhist practice and his 1:1 guidance
+* *Venerable Ñanaudā*: For his practical teachings of the Dhamma and his 1:1 guidance
+* *Open Source Community*: For tools and libraries enabling this work
+
+== References and Sources
+
+=== Primary Sources
+
+* *Abhidhamma Pitaka*: Dhammasangani, Vibhanga, Patthana
+* *Sutta Pitaka*: Majjhima Nikaya, Samyutta Nikaya, Anguttara Nikaya
+* *Vatthupama Sutta* (MN 7): The 16 defilements discourse
+
+=== Contemporary Academic Sources
+
+* Bodhi, B. (2000). _A Comprehensive Manual of Abhidhamma_
+* Gethin, R. (1998). _The Foundations of Buddhism_
+
+=== Contemplative Science References
+
+* Ingram, D. (2018). _Mastering the Core Teachings of the Buddha_
+
+=== Computational Approaches
+
+* Russell, S., & Norvig, P. (2020). _Artificial Intelligence: A Modern Approach_
+* Bishop, C. M. (2006). _Pattern Recognition and Machine Learning_
+* Rabiner, L. R. (1989). _A tutorial on hidden Markov models and selected applications_
+* Murphy, K. P. (2012). _Machine Learning: A Probabilistic Perspective_
+
+== License
+
+Public Domain (CC0 1.0 Universal)
+
+== Disclaimer
+
+This model is a theoretical framework for research purposes only. It does not represent any official Buddhist doctrine or practice.
+It is not intended for clinical use or as a substitute for professional mental health care.
+Users should exercise caution and consult qualified teachers or mental health professionals when applying contemplative practices.
+The author assumes no liability for any outcomes resulting from the use of this model.
+
+AI has been used to assist in drafting portions of this document. The author has reviewed and edited the content for accuracy and clarity.
