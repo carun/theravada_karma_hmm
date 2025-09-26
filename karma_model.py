@@ -300,6 +300,9 @@ class TheravadaKarmaHMM:
 
         self.history_log: List[Dict] = []
 
+        # Log initial state
+        self._log_state()
+
     def _init_ripening_patterns(self) -> Dict[str, Dict[RipeningType, float]]:
         return {
             'hatred': {RipeningType.IMMEDIATE: 0.4, RipeningType.NEXT_LIFE: 0.5,
@@ -384,12 +387,22 @@ class TheravadaKarmaHMM:
 
         total_unwholesome = sum(s.intensity * s.object_weight for s in seeds if not s.wholesome)
         total_wholesome = sum(s.intensity * s.object_weight for s in seeds if s.wholesome)
+
+        # Add meditation cultivation bonus
         total_wholesome += self.current_wholesome_cultivation * intention_strength
 
-        if wholesome or total_wholesome > 0:
+        if wholesome:
+            # Explicit wholesome action - always add positive karma
+            base_wholesome_value = intention_strength * 0.5  # Base value for virtuous intentions
+            total_wholesome = max(total_wholesome, base_wholesome_value)
             self.accumulated_wholesome += total_wholesome
         else:
-            self.accumulated_unwholesome += total_unwholesome
+            # Unwholesome action - add to unwholesome karma
+            self.accumulated_unwholesome += max(total_unwholesome, intention_strength * 0.3)
+
+        # Any wholesome cultivation from meditation still counts
+        if total_wholesome > 0 and not wholesome:
+            self.accumulated_wholesome += total_wholesome
 
         self._log_action(seeds, intention_strength, active_kilesas, wholesome)
         return seeds
@@ -523,6 +536,7 @@ class TheravadaKarmaHMM:
 
     def _log_action(self, seeds: List[KarmicSeed], intention_strength: float,
                    active_kilesas: Dict[str, float], wholesome: bool):
+        active_seeds = [s for s in self.karmic_seeds if s.current_strength(self.current_time) > 0.01]
         self.history_log.append({
             'time': self.current_time,
             'action_type': 'wholesome' if wholesome else 'unwholesome',
@@ -531,6 +545,7 @@ class TheravadaKarmaHMM:
             'seeds_created': len(seeds),
             'total_accumulated_unwholesome': self.accumulated_unwholesome,
             'total_accumulated_wholesome': self.accumulated_wholesome,
+            'active_seeds_count': len(active_seeds),
             'meditation_suppression': self.current_meditation_suppression,
             'path_stage': self.path_stage.value,
             'active_kilesa_count': len([k for k, v in self.current_kilesas.to_dict().items() if v > 0.01])
@@ -572,6 +587,14 @@ class TheravadaKarmaHMM:
                     'context_factors': self.current_context.copy(),
                     'meditation_influence': self.current_meditation_suppression
                 }
+
+                # Convert ripening seed energy to karma accumulation
+                karma_value = event['intensity'] * 0.8  # 80% of seed strength becomes karma
+                if seed.wholesome:
+                    self.accumulated_wholesome += karma_value
+                else:
+                    self.accumulated_unwholesome += karma_value
+
                 seed.ripening_history.append({
                     'time': self.current_time,
                     'type': ripening_type,
@@ -583,13 +606,25 @@ class TheravadaKarmaHMM:
 
     def _log_state(self):
         active_seeds = [s for s in self.karmic_seeds if s.current_strength(self.current_time) > 0.01]
+
+        # Check for path progression
+        self._check_path_progression()
+
+        # Calculate research metrics
+        karmic_balance = self.accumulated_wholesome - self.accumulated_unwholesome
+        meditation_effectiveness = self._calculate_meditation_effectiveness()
+        kilesa_suppression_rate = self._calculate_kilesa_suppression_rate()
+
         self.history_log.append({
             'time': self.current_time,
             'action_type': 'state_update',
             'total_accumulated_unwholesome': self.accumulated_unwholesome,
             'total_accumulated_wholesome': self.accumulated_wholesome,
+            'karmic_balance': karmic_balance,
             'active_seeds_count': len(active_seeds),
             'meditation_suppression': self.current_meditation_suppression,
+            'meditation_effectiveness': meditation_effectiveness,
+            'kilesa_suppression_rate': kilesa_suppression_rate,
             'path_stage': self.path_stage.value,
             'strongest_kilesas': sorted([(k, v) for k, v in self.current_kilesas.to_dict().items() if v > 0.01],
                                        key=lambda x: x[1], reverse=True)[:5],
@@ -654,6 +689,63 @@ class TheravadaKarmaHMM:
                 current_dict = {key: 0.0 for key in current_dict}
 
             self.current_kilesas.from_dict(current_dict)
+
+    def _check_path_progression(self):
+        """Check if practitioner should advance to next path stage"""
+        karmic_balance = self.accumulated_wholesome - self.accumulated_unwholesome
+        meditation_strength = sum(p.get_kilesa_suppression_factor() for p in self.meditation_practices)
+
+        # Progressive thresholds for path advancement
+        if self.path_stage == PathStage.ORDINARY and karmic_balance > 5.0 and meditation_strength > 1.5:
+            self.set_path_stage(PathStage.STREAM_ENTRY)
+        elif self.path_stage == PathStage.STREAM_ENTRY and karmic_balance > 15.0 and meditation_strength > 3.0:
+            self.set_path_stage(PathStage.ONCE_RETURNER)
+        elif self.path_stage == PathStage.ONCE_RETURNER and karmic_balance > 30.0 and meditation_strength > 5.0:
+            self.set_path_stage(PathStage.NON_RETURNER)
+        elif self.path_stage == PathStage.NON_RETURNER and karmic_balance > 50.0 and meditation_strength > 8.0:
+            # Additional check for complete kilesa eradication
+            max_kilesa = max(self.current_kilesas.to_dict().values())
+            if max_kilesa < 0.1:
+                self.set_path_stage(PathStage.ARAHANT)
+
+    def _calculate_meditation_effectiveness(self) -> float:
+        """Calculate how effective current meditation practices are"""
+        if not self.meditation_practices:
+            return 0.0
+
+        total_effectiveness = 0.0
+        for practice in self.meditation_practices:
+            # Factor in duration, consistency, quality, and guidance
+            base_effectiveness = practice.daily_duration * practice.consistency * practice.quality
+            experience_bonus = min(practice.years_practiced * 0.1, 1.0)  # Cap at 1.0 bonus
+            guidance_bonus = practice.teacher_guidance * 0.5
+            retreat_bonus = min(practice.retreat_hours * 0.001, 0.5)  # Cap at 0.5 bonus
+
+            effectiveness = base_effectiveness * (1 + experience_bonus + guidance_bonus + retreat_bonus)
+            total_effectiveness += effectiveness
+
+        return min(total_effectiveness / len(self.meditation_practices), 10.0)  # Normalize and cap
+
+    def _calculate_kilesa_suppression_rate(self) -> float:
+        """Calculate rate at which kilesas are being suppressed"""
+        current_kilesas = self.current_kilesas.to_dict()
+        total_kilesa_strength = sum(current_kilesas.values())
+
+        if total_kilesa_strength == 0:
+            return 1.0  # Complete suppression
+
+        # Calculate suppression based on meditation and path stage
+        meditation_suppression = self.current_meditation_suppression
+        path_suppression = {
+            PathStage.ORDINARY: 0.0,
+            PathStage.STREAM_ENTRY: 0.2,
+            PathStage.ONCE_RETURNER: 0.4,
+            PathStage.NON_RETURNER: 0.7,
+            PathStage.ARAHANT: 1.0
+        }.get(self.path_stage, 0.0)
+
+        combined_suppression = min(meditation_suppression + path_suppression, 1.0)
+        return combined_suppression
 
     def add_meditation_practice(self, practice: MeditationPractice):
         self.meditation_practices.append(practice)
@@ -1229,6 +1321,132 @@ class TheravadaKarmaHMM:
             print(f"Interactive network visualization saved to {html_path}")
         else:
             fig.show()
+
+    def get_visualization_json(self, viz_type: str = "evolution") -> dict:
+        """Get visualization data in JSON format for web UI"""
+        if not PLOTLY_AVAILABLE:
+            return {"error": "Plotly not available"}
+
+        if not self.history_log:
+            return {"error": "No history data available"}
+
+        if viz_type == "evolution":
+            return self._get_evolution_json()
+        elif viz_type == "kilesa_patterns":
+            return self._get_kilesa_patterns_json()
+        elif viz_type == "network":
+            return self._get_network_json()
+        else:
+            return {"error": f"Unknown visualization type: {viz_type}"}
+
+    def _get_evolution_json(self) -> dict:
+        """Get karmic evolution data as JSON"""
+        try:
+            import pandas as pd
+            df = pd.DataFrame(self.history_log)
+            state_data = df[df['action_type'] == 'state_update'].copy()
+
+            if state_data.empty:
+                return {"error": "No state data available"}
+
+            display_times = [self.time_scale.convert_to_display_units(t) for t in state_data['time']]
+            time_label = self.time_scale.get_display_label()
+            state_data['display_time'] = display_times
+
+            # Create the same structure as the plotly visualization but return data
+            path_stages = ['ordinary', 'stream_entry', 'once_returner', 'non_returner', 'arahant']
+            path_progression = [path_stages.index(row['path_stage']) for _, row in state_data.iterrows()]
+
+            return {
+                "time": display_times,
+                "time_label": time_label,
+                "wholesome_karma": state_data['total_accumulated_wholesome'].tolist(),
+                "unwholesome_karma": state_data['total_accumulated_unwholesome'].tolist(),
+                "active_seeds": state_data['active_seeds_count'].tolist(),
+                "meditation_suppression": state_data.get('meditation_suppression', [0]*len(display_times)),
+                "path_progression": path_progression,
+                "path_stage_labels": [s.replace('_', ' ').title() for s in path_stages]
+            }
+        except Exception as e:
+            return {"error": f"Failed to generate evolution data: {str(e)}"}
+
+    def _get_kilesa_patterns_json(self) -> dict:
+        """Get kilesa patterns data as JSON"""
+        try:
+            import pandas as pd
+            kilesa_timeline = []
+            for entry in self.history_log:
+                if entry['action_type'] not in ['wholesome', 'unwholesome']:
+                    continue
+                time_point = entry['time']
+                display_time = self.time_scale.convert_to_display_units(time_point)
+                for kilesa in entry.get('kilesas_activated', []):
+                    kilesa_timeline.append({
+                        'display_time': display_time,
+                        'kilesa': kilesa,
+                        'intensity': entry['intention_strength']
+                    })
+
+            if not kilesa_timeline:
+                return {"error": "No kilesa activation data available"}
+
+            kilesa_df = pd.DataFrame(kilesa_timeline)
+            pivot_table = kilesa_df.pivot_table(
+                values='intensity',
+                index='kilesa',
+                columns='display_time',
+                aggfunc='sum',
+                fill_value=0
+            )
+
+            return {
+                "time_label": self.time_scale.get_display_label(),
+                "kilesas": pivot_table.index.tolist(),
+                "times": [f"{t:.1f}" for t in pivot_table.columns],
+                "intensities": pivot_table.values.tolist()
+            }
+        except Exception as e:
+            return {"error": f"Failed to generate kilesa patterns: {str(e)}"}
+
+    def _get_network_json(self) -> dict:
+        """Get network data as JSON"""
+        try:
+            nodes = []
+            edges = []
+
+            # Get current kilesa strengths for node coloring
+            current_kilesas = self.current_kilesas.to_dict()
+
+            # Add nodes for all kilesas that have some activation
+            for kilesa, strength in current_kilesas.items():
+                if strength > 0.001:  # Show even weak activations
+                    nodes.append({
+                        "id": kilesa,
+                        "label": kilesa.replace('_', ' ').title(),
+                        "value": strength,
+                        "title": f"{kilesa}: {strength:.3f}"
+                    })
+
+            # Add edges for kilesa interactions
+            for (k1, k2), weight in self.kilesa_interactions.items():
+                if k1 in current_kilesas and k2 in current_kilesas:
+                    if current_kilesas[k1] > 0.001 and current_kilesas[k2] > 0.001:
+                        edges.append({
+                            "from": k1,
+                            "to": k2,
+                            "value": abs(weight) * 5,  # Scale for visibility
+                            "color": "#e74c3c" if weight > 0 else "#3498db",
+                            "title": f"{k1} ↔ {k2}: {weight:.3f}",
+                            "weight": weight
+                        })
+
+            return {
+                "nodes": nodes,
+                "edges": edges,
+                "interaction_count": len(edges)
+            }
+        except Exception as e:
+            return {"error": f"Failed to generate network data: {str(e)}"}
 
     def compare_scenarios(self, scenarios: List[Dict], time_steps: int = 30) -> Dict:
         """Compare different scenarios and return comparative analysis"""
